@@ -110,47 +110,6 @@ const SettingsScreen = ({ navigation }) => {
           />
         </SettingsSection>
 
-        {/* Account */}
-        <SettingsSection title="Account">
-          <SettingsItem
-            title="Change Password"
-            description="Update your account password"
-            onPress={() => {
-              Alert.alert('Feature Coming Soon', 'Password change functionality will be available in a future update.');
-            }}
-            showArrow
-          />
-          <SettingsItem
-            title="Export Data"
-            description="Download your shopping lists and data"
-            onPress={() => {
-              Alert.alert('Feature Coming Soon', 'Data export functionality will be available in a future update.');
-            }}
-            showArrow
-          />
-          <SettingsItem
-            title="Delete Account"
-            description="Permanently delete your account and all data"
-            onPress={() => {
-              Alert.alert(
-                'Delete Account',
-                'This action cannot be undone. Are you sure you want to delete your account?',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { 
-                    text: 'Delete', 
-                    style: 'destructive',
-                    onPress: () => {
-                      Alert.alert('Feature Coming Soon', 'Account deletion will be available in a future update.');
-                    }
-                  },
-                ]
-              );
-            }}
-            showArrow
-          />
-        </SettingsSection>
-
         {/* About */}
         <SettingsSection title="About">
           <SettingsItem

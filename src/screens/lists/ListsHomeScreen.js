@@ -87,9 +87,12 @@ const ListsHomeScreen = ({ navigation }) => {
   const renderHeader = () => {
     if (lists.length === 0) return null;
 
-    const totalLists = getTotalListsCount();
-    const totalItems = getTotalItemsCount();
-    const totalValue = getTotalValue();
+    const totalLists = lists.length;
+    const totalItems = lists.reduce((acc, list) => acc + (list.items?.length || 0), 0);
+    const totalValue = lists.reduce((acc, list) => {
+      const items = list.items || [];
+      return acc + items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
+    }, 0);
 
     return (
       <View style={styles.statsContainer}>

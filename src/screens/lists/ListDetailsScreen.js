@@ -1,4 +1,4 @@
-import React, { useState, useLayoutEffect } from 'react';
+import React, { useState, useLayoutEffect, useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet, Alert } from 'react-native';
 import ItemCard from '../../components/items/ItemCard';
 import AddItemModal from '../../components/items/AddItemModal';
@@ -9,13 +9,24 @@ import { useTheme } from '../../context/ThemeContext';
 
 const ListDetailsScreen = ({ route, navigation }) => {
   const { listId } = route.params;
-  const { getListById, addItem, removeItem, toggleItem } = useLists();
+  const { getList, addItem, deleteItem, toggleItemCompletion } = useLists();
   const theme = useTheme();
   const styles = getStyles(theme);
   const [showAdd, setShowAdd] = useState(false);
   const [error, setError] = useState(null);
+  const [list, setList] = useState({ items: [] });
 
-  const list = getListById(listId) || { items: [] };
+  useEffect(() => {
+    const loadList = () => {
+      const result = getList(listId);
+      if (result.success) {
+        setList(result.list);
+      } else {
+        setError(result.message || 'Failed to load list.');
+      }
+    };
+    loadList();
+  }, [listId, getList]);
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: list.name || 'List Details' });
@@ -25,17 +36,30 @@ const ListDetailsScreen = ({ route, navigation }) => {
     setError(null);
     const result = await addItem(listId, item);
     if (result.success) {
-        setShowAdd(false);
+      setShowAdd(false);
+      // Refresh list after adding item
+      const listResult = getList(listId);
+      if (listResult.success) {
+        setList(listResult.list);
+      }
     } else {
-        setError(result.message || 'Failed to add item.');
+      setError(result.message || 'Failed to add item.');
     }
   };
 
   const handleToggle = async (item) => {
     setError(null);
-    const result = await toggleItem(listId, item.id);
-    if (!result.success) {
-        setError(result.message || 'Failed to update item.');
+    const result = await toggleItemCompletion(listId, item.id);
+    if (result.success) {
+      // Update the item in the local state directly using the returned item
+      setList(prevList => ({
+        ...prevList,
+        items: prevList.items.map(i => 
+          i.id === item.id ? result.item : i
+        )
+      }));
+    } else {
+      setError(result.message || 'Failed to update item.');
     }
   };
   
@@ -43,24 +67,30 @@ const ListDetailsScreen = ({ route, navigation }) => {
     Alert.alert('Delete Item', `Remove "${item.name}"?`, [
       { text: 'Cancel', style: 'cancel' },
       { 
-          text: 'Delete', 
-          style: 'destructive', 
-          onPress: async () => {
-            setError(null);
-            const result = await removeItem(listId, item.id);
-            if (!result.success) {
-                setError(result.message || 'Failed to remove item.');
+        text: 'Delete', 
+        style: 'destructive', 
+        onPress: async () => {
+          setError(null);
+          const result = await deleteItem(listId, item.id);
+          if (result.success) {
+            // Refresh list after deleting item
+            const listResult = getList(listId);
+            if (listResult.success) {
+              setList(listResult.list);
             }
-          } 
+          } else {
+            setError(result.message || 'Failed to remove item.');
+          }
+        } 
       },
     ]);
   };
 
   const renderItem = ({ item }) => (
     <ItemCard 
-        item={item} 
-        onToggle={handleToggle} 
-        onLongPress={handleDelete}
+      item={item} 
+      onToggle={handleToggle} 
+      onLongPress={handleDelete}
     />
   );
 
@@ -103,6 +133,14 @@ const getStyles = (theme) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.border,
     paddingBottom: 16,
+    backgroundColor: theme.surface,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: theme.text,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   title: { 
     fontSize: 28, 
@@ -112,14 +150,28 @@ const getStyles = (theme) => StyleSheet.create({
   },
   footer: { 
     padding: 16,
+    paddingBottom: 32,
     borderTopWidth: 1,
     borderTopColor: theme.border,
-    backgroundColor: theme.background,
+    backgroundColor: theme.surface,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    shadowColor: theme.text,
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
   errorText: {
     color: theme.error,
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 16,
+    fontSize: 16,
+    backgroundColor: theme.error + '10',
+    padding: 8,
+    borderRadius: 8,
   },
 });
 

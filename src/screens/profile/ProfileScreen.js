@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
-    Alert,
     SafeAreaView,
     ScrollView,
     StyleSheet,
@@ -16,31 +15,9 @@ import SettingsSection from '../../components/profile/SettingsSection';
 import ProfileItem from '../../components/profile/ProfileItem';
 
 const ProfileScreen = ({ navigation }) => {
-  const { user, signOut, getUserFullName, isPremiumUser } = useAuth();
+  const { user, getUserFullName, isPremiumUser } = useAuth();
   const theme = useTheme();
   const styles = getStyles(theme);
-  const [error, setError] = useState(null);
-
-  const handleSignOut = async () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Sign Out', 
-          style: 'destructive',
-          onPress: async () => {
-            setError(null);
-            const result = await signOut();
-            if (!result.success) {
-              setError(result.message || 'Failed to sign out.');
-            }
-          }
-        },
-      ]
-    );
-  };
 
   const handleSettings = () => {
     navigation.navigate('Settings');
@@ -57,14 +34,14 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.header}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
-              {getUserFullName().split(' ').map(n => n[0]).join('').toUpperCase()}
+              {getUserFullName().split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
             </Text>
           </View>
           <Text style={styles.name}>
             {getUserFullName()}
           </Text>
           <Text style={styles.email}>
-            {user?.email}
+            {user?.email || 'local@example.com'}
           </Text>
           {isPremiumUser() && (
             <View style={styles.premiumBadge}>
@@ -72,8 +49,6 @@ const ProfileScreen = ({ navigation }) => {
             </View>
           )}
         </View>
-
-        {error && <Text style={styles.errorText}>{error}</Text>}
 
         {/* Account Info */}
         <SettingsSection>
@@ -87,10 +62,6 @@ const ProfileScreen = ({ navigation }) => {
           <ProfileItem
             title="Email"
             value={user?.email || ''}
-          />
-          <ProfileItem
-            title="Member Since"
-            value={user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
           />
         </SettingsSection>
 
@@ -158,15 +129,6 @@ const ProfileScreen = ({ navigation }) => {
               Settings
             </Text>
             <Feather name="chevron-right" size={20} color={theme.textSecondary} />
-          </TouchableOpacity>
-          
-          <View style={styles.divider} />
-          
-          <TouchableOpacity style={styles.actionItem} onPress={handleSignOut}>
-            <Feather name="log-out" size={20} color={theme.error} />
-            <Text style={[styles.actionText, { color: theme.error }]}>
-              Sign Out
-            </Text>
           </TouchableOpacity>
         </SettingsSection>
       </ScrollView>
@@ -248,24 +210,25 @@ const getStyles = (theme) => StyleSheet.create({
         marginBottom: 16,
     },
     upgradeButton: {
-        width: '100%',
+        minWidth: 160,
     },
     statsRow: {
         flexDirection: 'row',
         justifyContent: 'space-around',
+        paddingVertical: 16,
     },
     stat: {
         alignItems: 'center',
     },
     statNumber: {
-        fontSize: 22,
+        fontSize: 28,
         fontWeight: 'bold',
         color: theme.primary,
+        marginBottom: 4,
     },
     statLabel: {
-        fontSize: 14,
+        fontSize: 12,
         color: theme.textSecondary,
-        marginTop: 4,
     },
     actionItem: {
         flexDirection: 'row',
@@ -274,24 +237,14 @@ const getStyles = (theme) => StyleSheet.create({
     },
     actionText: {
         fontSize: 16,
+        color: theme.text,
         marginLeft: 16,
         flex: 1,
-        color: theme.text,
     },
     divider: {
         height: 1,
         backgroundColor: theme.border,
-        marginHorizontal: -16,
-    },
-    errorText: {
-        color: theme.error,
-        textAlign: 'center',
-        marginBottom: 16,
-        padding: 8,
-        backgroundColor: theme.surface,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: theme.error,
+        marginVertical: 4,
     },
 });
 

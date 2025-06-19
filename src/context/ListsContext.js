@@ -1,9 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useReducer } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useState } from 'react';
 import { calculateShoppingStats } from '../utils/calculations';
-import { STORAGE_KEYS } from '../utils/constants';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from './AuthContext';
 import { generateUUID } from '../utils/helpers';
+import { STORAGE_KEYS } from '../utils/constants';
 
 // Initial state
 const initialState = {
@@ -11,8 +11,6 @@ const initialState = {
   currentList: null,
   isLoading: false,
   error: null,
-  offlineLists: [],
-  syncPending: false,
 };
 
 // Action types
@@ -25,9 +23,6 @@ const ActionTypes = {
   DELETE_LIST: 'DELETE_LIST',
   SET_ERROR: 'SET_ERROR',
   CLEAR_ERROR: 'CLEAR_ERROR',
-  SET_OFFLINE_LISTS: 'SET_OFFLINE_LISTS',
-  ADD_OFFLINE_LIST: 'ADD_OFFLINE_LIST',
-  SET_SYNC_PENDING: 'SET_SYNC_PENDING',
   UPDATE_LIST_STATS: 'UPDATE_LIST_STATS',
   ADD_ITEM: 'ADD_ITEM',
   UPDATE_ITEM: 'UPDATE_ITEM',
@@ -97,6 +92,12 @@ const listsReducer = (state, action) => {
             ? { ...list, items: [...(list.items || []), item] }
             : list
         ),
+        currentList: state.currentList?.id === listId
+          ? {
+              ...state.currentList,
+              items: [...(state.currentList.items || []), item]
+            }
+          : state.currentList,
       };
     }
 
@@ -114,6 +115,14 @@ const listsReducer = (state, action) => {
               }
             : list
         ),
+        currentList: state.currentList?.id === listId
+          ? {
+              ...state.currentList,
+              items: (state.currentList.items || []).map(item =>
+                item.id === updatedItem.id ? updatedItem : item
+              )
+            }
+          : state.currentList,
       };
     }
 
@@ -126,6 +135,12 @@ const listsReducer = (state, action) => {
             ? { ...list, items: (list.items || []).filter(item => item.id !== itemId) }
             : list
         ),
+        currentList: state.currentList?.id === listId
+          ? {
+              ...state.currentList,
+              items: (state.currentList.items || []).filter(item => item.id !== itemId)
+            }
+          : state.currentList,
       };
     }
 
@@ -143,6 +158,14 @@ const listsReducer = (state, action) => {
               }
             : list
         ),
+        currentList: state.currentList?.id === listId
+          ? {
+              ...state.currentList,
+              items: (state.currentList.items || []).map(item =>
+                item.id === itemId ? { ...item, completed: !item.completed } : item
+              )
+            }
+          : state.currentList,
       };
     }
 
@@ -159,47 +182,6 @@ const listsReducer = (state, action) => {
         error: null,
       };
 
-    case ActionTypes.SET_OFFLINE_LISTS:
-      return {
-        ...state,
-        offlineLists: action.payload,
-      };
-
-    case ActionTypes.ADD_OFFLINE_LIST:
-      return {
-        ...state,
-        offlineLists: [...state.offlineLists, action.payload],
-      };
-
-    case ActionTypes.SET_SYNC_PENDING:
-      return {
-        ...state,
-        syncPending: action.payload,
-      };
-
-    case ActionTypes.UPDATE_LIST_STATS:
-      const { listId: statsListId, stats } = action.payload;
-      const updatedList = state.lists.find(l => l.id === statsListId);
-      if (!updatedList) return state;
-      
-      const newListWithStats = {
-        ...updatedList,
-        totalItems: stats.totalItems,
-        completedItems: stats.completedItems,
-        totalValue: stats.totalValue,
-        completedValue: stats.completedValue,
-      };
-      
-      return {
-        ...state,
-        lists: state.lists.map(list =>
-          list.id === statsListId ? newListWithStats : list
-        ),
-        currentList: state.currentList?.id === statsListId 
-          ? newListWithStats 
-          : state.currentList,
-      };
-
     default:
       return state;
   }
@@ -208,173 +190,331 @@ const listsReducer = (state, action) => {
 // Create context
 const ListsContext = createContext();
 
+// Helper function to save lists to AsyncStorage
+const saveLists = async (lists) => {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.LISTS, JSON.stringify(lists));
+  } catch (error) {
+    console.error('Error saving lists to AsyncStorage:', error);
+  }
+};
+
 // Lists provider component
 export const ListsProvider = ({ children }) => {
   const [state, dispatch] = useReducer(listsReducer, initialState);
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
 
-  // Load lists from AsyncStorage
+  // Load lists from AsyncStorage when component mounts
   useEffect(() => {
     const loadLists = async () => {
-      if (!isAuthenticated || !user) {
-        dispatch({ type: ActionTypes.SET_LISTS, payload: [] });
-        return;
-      }
+      dispatch({ type: ActionTypes.SET_LOADING, payload: true });
+      
       try {
-        dispatch({ type: ActionTypes.SET_LOADING, payload: true });
-        const storedLists = await AsyncStorage.getItem(`${STORAGE_KEYS.LISTS}_${user.uid}`);
-        if (storedLists) {
-          dispatch({ type: ActionTypes.SET_LISTS, payload: JSON.parse(storedLists) });
+        const listsJson = await AsyncStorage.getItem(STORAGE_KEYS.LISTS);
+        
+        if (listsJson) {
+          const lists = JSON.parse(listsJson);
+          
+          // Calculate stats for each list
+          const processedLists = lists.map(list => {
+            const items = list.items || [];
+            const stats = calculateShoppingStats(items);
+            return { ...list, stats };
+          });
+          
+          dispatch({ type: ActionTypes.SET_LISTS, payload: processedLists });
         } else {
           dispatch({ type: ActionTypes.SET_LISTS, payload: [] });
         }
       } catch (error) {
-        dispatch({ type: ActionTypes.SET_ERROR, payload: 'Failed to load lists.' });
-      } finally {
-        dispatch({ type: ActionTypes.SET_LOADING, payload: false });
+        console.error('Error loading lists from AsyncStorage:', error);
+        dispatch({ 
+          type: ActionTypes.SET_ERROR, 
+          payload: 'Failed to load shopping lists.' 
+        });
       }
     };
+    
     loadLists();
-  }, [isAuthenticated, user]);
+  }, []);
 
-  // Save lists to AsyncStorage whenever they change
+  // Save lists to AsyncStorage whenever they change, but skip during refresh
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
   useEffect(() => {
-    const saveLists = async () => {
-      if (isAuthenticated && user && !state.isLoading) {
-        try {
-          await AsyncStorage.setItem(
-            `${STORAGE_KEYS.LISTS}_${user.uid}`,
-            JSON.stringify(state.lists)
-          );
-        } catch (error) {
-          console.error('Failed to save lists to storage:', error);
-        }
-      }
-    };
-    saveLists();
-  }, [state.lists, isAuthenticated, user, state.isLoading]);
+    if (!isRefreshing) {
+      saveLists(state.lists);
+    }
+  }, [state.lists, isRefreshing]);
 
-  // Action creators
+  // Define actions for the context
   const actions = {
-    // Create a new list
+    // Create a new shopping list
     createList: async (listData) => {
       try {
-        if (!user) throw new Error('User not authenticated');
+        const timestamp = new Date();
+        
         const newList = {
           id: generateUUID(),
           ...listData,
-          ownerId: user.uid,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
           items: [],
-          sharedWith: [],
+          ownerId: user.uid,
+          createdAt: timestamp,
+          updatedAt: timestamp,
         };
+        
         dispatch({ type: ActionTypes.ADD_LIST, payload: newList });
-        return { success: true, list: newList, message: 'List created successfully!' };
+        return { success: true, list: newList };
       } catch (error) {
-        return { success: false, message: error.message };
+        console.error('Error creating list:', error);
+        dispatch({ 
+          type: ActionTypes.SET_ERROR, 
+          payload: 'Failed to create list.'
+        });
+        return { success: false, error: 'Failed to create list.' };
       }
     },
-
-    // Update a list
-    updateList: async (listId, updateData) => {
-      const listToUpdate = state.lists.find(list => list.id === listId);
-      if (!listToUpdate) return { success: false, message: 'List not found' };
-
-      const updatedList = {
-        ...listToUpdate,
-        ...updateData,
-        updatedAt: new Date().toISOString(),
-      };
-      dispatch({ type: ActionTypes.UPDATE_LIST, payload: updatedList });
-      return { success: true, message: 'List updated successfully!' };
+    
+    // Get a single list by ID
+    getList: (listId) => {
+      try {
+        const list = state.lists.find(item => item.id === listId);
+        
+        if (list) {
+          return { success: true, list };
+        }
+        
+        return { success: false, error: 'List not found.' };
+      } catch (error) {
+        console.error('Error getting list:', error);
+        return { success: false, error: 'Error retrieving list.' };
+      }
     },
-
+    
+    // Update a list
+    updateList: async (listId, updatedData) => {
+      try {
+        const listIndex = state.lists.findIndex(list => list.id === listId);
+        
+        if (listIndex === -1) {
+          dispatch({ 
+            type: ActionTypes.SET_ERROR, 
+            payload: 'List not found.'
+          });
+          return { success: false, error: 'List not found.' };
+        }
+        
+        const updatedList = {
+          ...state.lists[listIndex],
+          ...updatedData,
+          updatedAt: new Date(),
+        };
+        
+        dispatch({ type: ActionTypes.UPDATE_LIST, payload: updatedList });
+        return { success: true, list: updatedList };
+      } catch (error) {
+        console.error('Error updating list:', error);
+        dispatch({ 
+          type: ActionTypes.SET_ERROR, 
+          payload: 'Failed to update list.'
+        });
+        return { success: false, error: 'Failed to update list.' };
+      }
+    },
+    
     // Delete a list
     deleteList: async (listId) => {
-      dispatch({ type: ActionTypes.DELETE_LIST, payload: listId });
-      return { success: true, message: 'List deleted successfully!' };
-    },
-
-    // Get a single list by ID
-    getListById: (listId) => {
-      return state.lists.find(list => list.id === listId) || null;
+      try {
+        dispatch({ type: ActionTypes.DELETE_LIST, payload: listId });
+        return { success: true };
+      } catch (error) {
+        console.error('Error deleting list:', error);
+        dispatch({ 
+          type: ActionTypes.SET_ERROR, 
+          payload: 'Failed to delete list.'
+        });
+        return { success: false, error: 'Failed to delete list.' };
+      }
     },
     
     // Add an item to a list
     addItem: async (listId, itemData) => {
-      const newItem = {
-        id: generateUUID(),
-        ...itemData,
-        createdAt: new Date().toISOString(),
-        completed: false,
-      };
-      dispatch({ type: ActionTypes.ADD_ITEM, payload: { listId, item: newItem } });
-      return { success: true, item: newItem };
+      try {
+        const newItem = {
+          id: generateUUID(),
+          ...itemData,
+          completed: false,
+          createdAt: new Date(),
+        };
+        
+        dispatch({ 
+          type: ActionTypes.ADD_ITEM, 
+          payload: { listId, item: newItem }
+        });
+        
+        return { success: true, item: newItem };
+      } catch (error) {
+        console.error('Error adding item:', error);
+        dispatch({ 
+          type: ActionTypes.SET_ERROR, 
+          payload: 'Failed to add item.'
+        });
+        return { success: false, error: 'Failed to add item.' };
+      }
     },
     
     // Update an item in a list
-    updateItem: async (listId, itemId, updateData) => {
-      const list = state.lists.find(l => l.id === listId);
-      const item = list?.items.find(i => i.id === itemId);
-      if (!item) return { success: false, message: 'Item not found' };
-
-      const updatedItem = { ...item, ...updateData };
-      dispatch({ type: ActionTypes.UPDATE_ITEM, payload: { listId, item: updatedItem } });
-      return { success: true };
-    },
-
-    // Delete an item from a list
-    deleteItem: async (listId, itemId) => {
-      dispatch({ type: ActionTypes.DELETE_ITEM, payload: { listId, itemId } });
-      return { success: true };
-    },
-
-    // Toggle item completion
-    toggleItem: async (listId, itemId) => {
-      dispatch({ type: ActionTypes.TOGGLE_ITEM, payload: { listId, itemId } });
-      return { success: true };
-    },
-
-    // Refresh lists (now just re-calculates stats)
-    refreshLists: async () => {
-      state.lists.forEach(list => {
-        const stats = calculateShoppingStats(list.items);
-        dispatch({ type: ActionTypes.UPDATE_LIST_STATS, payload: { listId: list.id, stats } });
-      });
-      return { success: true };
-    },
-
-    // Get stats for a list
-    getListStats: (listId) => {
-      const list = state.lists.find(l => l.id === listId);
-      return list ? calculateShoppingStats(list.items) : calculateShoppingStats([]);
+    updateItem: async (listId, itemId, updatedData) => {
+      try {
+        const list = state.lists.find(l => l.id === listId);
+        
+        if (!list) {
+          dispatch({ 
+            type: ActionTypes.SET_ERROR, 
+            payload: 'List not found.'
+          });
+          return { success: false, error: 'List not found.' };
+        }
+        
+        const itemIndex = list.items.findIndex(item => item.id === itemId);
+        
+        if (itemIndex === -1) {
+          dispatch({ 
+            type: ActionTypes.SET_ERROR, 
+            payload: 'Item not found.'
+          });
+          return { success: false, error: 'Item not found.' };
+        }
+        
+        const updatedItem = {
+          ...list.items[itemIndex],
+          ...updatedData,
+          updatedAt: new Date(),
+        };
+        
+        dispatch({ 
+          type: ActionTypes.UPDATE_ITEM, 
+          payload: { listId, item: updatedItem }
+        });
+        
+        return { success: true, item: updatedItem };
+      } catch (error) {
+        console.error('Error updating item:', error);
+        dispatch({ 
+          type: ActionTypes.SET_ERROR, 
+          payload: 'Failed to update item.'
+        });
+        return { success: false, error: 'Failed to update item.' };
+      }
     },
     
-    // Get total counts
-    getTotalListsCount: () => state.lists.length,
-    getTotalItemsCount: () => state.lists.reduce((acc, list) => acc + (list.items?.length || 0), 0),
-    getTotalValue: () =>
-      state.lists.reduce((acc, list) => {
-        const stats = calculateShoppingStats(list.items);
-        return acc + stats.totalValue;
-      }, 0),
+    // Delete an item from a list
+    deleteItem: async (listId, itemId) => {
+      try {
+        dispatch({ 
+          type: ActionTypes.DELETE_ITEM, 
+          payload: { listId, itemId }
+        });
+        
+        return { success: true };
+      } catch (error) {
+        console.error('Error deleting item:', error);
+        dispatch({ 
+          type: ActionTypes.SET_ERROR, 
+          payload: 'Failed to delete item.'
+        });
+        return { success: false, error: 'Failed to delete item.' };
+      }
+    },
+    
+    // Toggle item completion status
+    toggleItemCompletion: async (listId, itemId) => {
+      try {
+        const list = state.lists.find(l => l.id === listId);
+        if (!list) {
+          throw new Error('List not found');
+        }
+
+        const item = list.items.find(i => i.id === itemId);
+        if (!item) {
+          throw new Error('Item not found');
+        }
+
+        const updatedItem = {
+          ...item,
+          completed: !item.completed,
+          updatedAt: new Date()
+        };
+
+        dispatch({ 
+          type: ActionTypes.UPDATE_ITEM, 
+          payload: { listId, item: updatedItem }
+        });
+        
+        return { success: true, item: updatedItem };
+      } catch (error) {
+        console.error('Error toggling item:', error);
+        dispatch({ 
+          type: ActionTypes.SET_ERROR, 
+          payload: error.message || 'Failed to update item.'
+        });
+        return { success: false, error: error.message || 'Failed to update item.' };
+      }
+    },
+    
+    // Clear error state
+    clearError: () => {
+      dispatch({ type: ActionTypes.CLEAR_ERROR });
+    },
+    
+    // Refresh lists from storage
+    refreshLists: async () => {
+      setIsRefreshing(true);
+      dispatch({ type: ActionTypes.SET_LOADING, payload: true });
+      
+      try {
+        const listsJson = await AsyncStorage.getItem(STORAGE_KEYS.LISTS);
+        
+        if (listsJson) {
+          const lists = JSON.parse(listsJson);
+          
+          // Calculate stats for each list
+          const processedLists = lists.map(list => {
+            const items = list.items || [];
+            const stats = calculateShoppingStats(items);
+            return { ...list, stats };
+          });
+          
+          dispatch({ type: ActionTypes.SET_LISTS, payload: processedLists });
+        } else {
+          dispatch({ type: ActionTypes.SET_LISTS, payload: [] });
+        }
+        
+        setIsRefreshing(false);
+        return { success: true };
+      } catch (error) {
+        console.error('Error refreshing lists:', error);
+        dispatch({ 
+          type: ActionTypes.SET_ERROR, 
+          payload: 'Failed to refresh lists.' 
+        });
+        setIsRefreshing(false);
+        return { success: false, error: 'Failed to refresh lists.' };
+      }
+    },
+  };
+  
+  // Provide context value
+  const value = {
+    ...state,
+    ...actions,
   };
 
   return (
-    <ListsContext.Provider value={{ ...state, ...actions }}>
+    <ListsContext.Provider value={value}>
       {children}
     </ListsContext.Provider>
   );
 };
 
-// Custom hook to use the lists context
-export const useLists = () => {
-  const context = useContext(ListsContext);
-  if (context === undefined) {
-    throw new Error('useLists must be used within a ListsProvider');
-  }
-  return context;
-};
-
-export default ListsContext;
+export const useLists = () => useContext(ListsContext);

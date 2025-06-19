@@ -30,7 +30,7 @@ const tutorialData = [
   {
     id: '4',
     title: 'Ready to Start!',
-    description: 'You\'re all set! Let\'s create your account and start building your first shopping list.',
+    description: 'You\'re all set! Get started building your first shopping list.',
   },
 ];
 
@@ -57,7 +57,7 @@ const TutorialScreen = ({ navigation }) => {
 
   const handleComplete = async () => {
     await completeOnboarding();
-    navigation.navigate('Auth');
+    navigation.replace('Main');
   };
 
   const onViewableItemsChanged = ({ viewableItems }) => {

@@ -39,24 +39,25 @@ export const APP_CONFIG = {
   };
   
   // Storage keys
-  export const STORAGE_KEYS = {
-    // Auth
-    ACCESS_TOKEN: '@grocery_buddy_access_token',
-    REFRESH_TOKEN: '@grocery_buddy_refresh_token',
-    USER_DATA: '@grocery_buddy_user_data',
-    BIOMETRIC_ENABLED: '@grocery_buddy_biometric_enabled',
-    
-    // App state
-    THEME_PREFERENCE: '@grocery_buddy_theme',
-    LANGUAGE_PREFERENCE: '@grocery_buddy_language',
-    ONBOARDING_COMPLETED: '@grocery_buddy_onboarding_completed',
-    NOTIFICATIONS_ENABLED: '@grocery_buddy_notifications',
-    
-    // Lists and items
-    OFFLINE_LISTS: '@grocery_buddy_offline_lists',
-    DRAFT_LISTS: '@grocery_buddy_draft_lists',
-    RECENT_ITEMS: '@grocery_buddy_recent_items',
-    FAVORITE_ITEMS: '@grocery_buddy_favorite_items',
+export const STORAGE_KEYS = {
+  // Auth
+  ACCESS_TOKEN: '@grocery_buddy_access_token',
+  REFRESH_TOKEN: '@grocery_buddy_refresh_token',
+  USER_DATA: '@grocery_buddy_user_data',
+  BIOMETRIC_ENABLED: '@grocery_buddy_biometric_enabled',
+  
+  // App state
+  THEME_PREFERENCE: '@grocery_buddy_theme',
+  LANGUAGE_PREFERENCE: '@grocery_buddy_language',
+  ONBOARDING_COMPLETED: '@grocery_buddy_onboarding_completed',
+  NOTIFICATIONS_ENABLED: '@grocery_buddy_notifications',
+  
+  // Lists and items
+  LISTS: '@grocery_buddy_lists',
+  OFFLINE_LISTS: '@grocery_buddy_offline_lists',
+  DRAFT_LISTS: '@grocery_buddy_draft_lists',
+  RECENT_ITEMS: '@grocery_buddy_recent_items',
+  FAVORITE_ITEMS: '@grocery_buddy_favorite_items',
     
     // Settings
     CURRENCY_PREFERENCE: '@grocery_buddy_currency',

@@ -8,17 +8,21 @@ import {
 import { Feather } from '@expo/vector-icons';
 import Button from '../../components/common/Button';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 
 const WelcomeScreen = ({ navigation }) => {
   const theme = useTheme();
+  const { completeOnboarding } = useAuth();
   const styles = getStyles(theme);
 
   const handleGetStarted = () => {
     navigation.navigate('Tutorial');
   };
 
-  const handleSkip = () => {
-    navigation.navigate('Auth');
+  const handleSkip = async () => {
+    // Complete onboarding and go straight to main app
+    await completeOnboarding();
+    navigation.replace('Main');
   };
 
   return (
@@ -78,7 +82,7 @@ const WelcomeScreen = ({ navigation }) => {
           />
           
           <Button
-            title="Skip Introduction"
+            title="Skip Tutorial"
             onPress={handleSkip}
             variant="ghost"
             style={styles.skipButton}

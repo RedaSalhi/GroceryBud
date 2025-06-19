@@ -1,14 +1,14 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import React from 'react';
-import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 
 // Import navigators
-import AuthNavigator from './AuthNavigator';
 import TabNavigator from './TabNavigator';
 
 // Import screens
+import ErrorBoundary from '../components/common/ErrorBoundary';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import TutorialScreen from '../screens/onboarding/TutorialScreen';
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
@@ -16,7 +16,7 @@ import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
 const Stack = createStackNavigator();
 
 const AppNavigator = () => {
-  const { isAuthenticated, isLoading, onboardingCompleted } = useAuth();
+  const { isLoading, onboardingCompleted } = useAuth();
   const theme = useTheme();
 
   // Build a theme object compatible with React Navigation (must include fonts)
@@ -39,60 +39,25 @@ const AppNavigator = () => {
     },
   };
 
-  // Show loading spinner while checking authentication
+  // Show loading spinner while checking onboarding status
   if (isLoading) {
-    return <LoadingSpinner />;
+    return <LoadingSpinner fullScreen text="Loading..." />;
   }
 
   return (
-    <NavigationContainer
-      theme={navigationTheme}
-    >
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-          gestureEnabled: true,
-          animationEnabled: true,
-        }}
-      >
-        {!isAuthenticated ? (
-          // Authentication flow
-          <>
-            {!onboardingCompleted && (
-              <>
-                <Stack.Screen
-                  name="Welcome"
-                  component={WelcomeScreen}
-                  options={{
-                    animationTypeForReplace: 'push',
-                  }}
-                />
-                <Stack.Screen
-                  name="Tutorial"
-                  component={TutorialScreen}
-                />
-              </>
-            )}
-            <Stack.Screen
-              name="Auth"
-              component={AuthNavigator}
-              options={{
-                animationTypeForReplace: 'push',
-              }}
-            />
-          </>
-        ) : (
-          // Main app flow
-          <Stack.Screen
-            name="Main"
-            component={TabNavigator}
-            options={{
-              animationTypeForReplace: 'push',
-            }}
-          />
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+    <ErrorBoundary>
+      <NavigationContainer theme={navigationTheme}>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {!onboardingCompleted && (
+            <>
+              <Stack.Screen name="Welcome" component={WelcomeScreen} />
+              <Stack.Screen name="Tutorial" component={TutorialScreen} />
+            </>
+          )}
+          <Stack.Screen name="Main" component={TabNavigator} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </ErrorBoundary>
   );
 };
 
