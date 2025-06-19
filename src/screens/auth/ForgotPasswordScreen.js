@@ -19,7 +19,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
   const [emailSent, setEmailSent] = useState(false);
   const [resetError, setResetError] = useState(null);
   
-  const { resetPassword } = useAuth();
+  const { forgotPassword } = useAuth();
   const theme = useTheme();
   const styles = getStyles(theme);
 
@@ -43,7 +43,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
     setResetError(null);
 
     try {
-      const result = await resetPassword(email);
+      const result = await forgotPassword(email);
       
       if (result.success) {
         setEmailSent(true);
