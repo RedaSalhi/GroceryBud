@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useReducer } from 'react';
 import { STORAGE_KEYS } from '../utils/constants';
 import { generateUUID } from '../utils/helpers';
+import { forgotPasswordRequest, resetPasswordRequest } from './authMockService';
 
 // Initial state
 const initialState = {
@@ -134,6 +135,8 @@ const getCurrentUser = async () => {
   return { success: false, user: null };
 };
 
+// Mock forgotPassword
+
 // --- Auth Context ---
 
 const AuthContext = createContext();
@@ -186,6 +189,28 @@ export const AuthProvider = ({ children }) => {
       const result = await signOutUser();
       if (result.success) {
         dispatch({ type: ActionTypes.SIGN_OUT });
+      }
+      dispatch({ type: ActionTypes.SET_LOADING, payload: false });
+      return result;
+    },
+    forgotPassword: async (email) => {
+      dispatch({ type: ActionTypes.SET_LOADING, payload: true });
+      const result = await forgotPasswordRequest(email);
+      if (!result.success) {
+        dispatch({ type: ActionTypes.SET_ERROR, payload: result.message });
+      } else {
+        dispatch({ type: ActionTypes.CLEAR_ERROR });
+      }
+      dispatch({ type: ActionTypes.SET_LOADING, payload: false });
+      return result;
+    },
+    resetPassword: async (email, password) => {
+      dispatch({ type: ActionTypes.SET_LOADING, payload: true });
+      const result = await resetPasswordRequest(email, password);
+      if (!result.success) {
+        dispatch({ type: ActionTypes.SET_ERROR, payload: result.message });
+      } else {
+        dispatch({ type: ActionTypes.CLEAR_ERROR });
       }
       dispatch({ type: ActionTypes.SET_LOADING, payload: false });
       return result;
