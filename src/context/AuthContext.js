@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useReducer } from 'react';
-import { STORAGE_KEYS } from '../utils/constants';
+import { STORAGE_KEYS, USER_ROLES } from '../utils/constants';
 import { generateUUID } from '../utils/helpers';
 import { forgotPasswordRequest, resetPasswordRequest } from './authMockService';
 
@@ -80,6 +80,22 @@ const authReducer = (state, action) => {
 
 const MOCK_USERS_KEY = 'MOCK_USERS_DB';
 const CURRENT_USER_KEY = 'CURRENT_USER_SESSION';
+
+// Helper utilities for computing user properties
+export const getUserFullNameFromData = (user) => {
+  if (!user) return 'Guest';
+  const { firstName, lastName, displayName, email } = user;
+  const name = `${firstName || ''} ${lastName || ''}`.trim();
+  if (name) return name;
+  if (displayName) return displayName;
+  return email || 'User';
+};
+
+export const isPremiumUserFromData = (user) => {
+  if (!user) return false;
+  const { role, subscription } = user;
+  return role === USER_ROLES.PREMIUM || String(subscription).toLowerCase() === 'premium';
+};
 
 // Helper to get all stored users
 const getMockUsers = async () => {
@@ -244,8 +260,13 @@ export const AuthProvider = ({ children }) => {
     },
   };
 
+  const helpers = {
+    getUserFullName: () => getUserFullNameFromData(state.user),
+    isPremiumUser: () => isPremiumUserFromData(state.user),
+  };
+
   return (
-    <AuthContext.Provider value={{ ...state, ...actions }}>
+    <AuthContext.Provider value={{ ...state, ...actions, ...helpers }}>
       {children}
     </AuthContext.Provider>
   );
