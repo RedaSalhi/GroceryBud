@@ -15,7 +15,15 @@ export const THEME_MODES = {
 // Initial state
 const initialState = {
   mode: THEME_MODES.AUTO,
-  theme: lightTheme,
+  theme: {
+    ...lightTheme,
+    typography,
+    fonts: {
+      regular: typography.body1.fontFamily || 'System',
+      medium: typography.label.fontFamily || 'System',
+      bold: typography.h1.fontFamily || 'System',
+    },
+  },
   isDark: false,
   systemTheme: Appearance.getColorScheme() || 'light',
 };
@@ -41,10 +49,14 @@ const themeReducer = (state, action) => {
         ...state,
         mode,
         isDark,
-        theme: { 
-          ...newTheme, 
-          typography, 
-          fonts: { regular: typography.body1 } 
+        theme: {
+          ...newTheme,
+          typography,
+          fonts: {
+            regular: typography.body1.fontFamily || 'System',
+            medium: typography.label.fontFamily || 'System',
+            bold: typography.h1.fontFamily || 'System',
+          },
         },
       };
     }
@@ -60,10 +72,14 @@ const themeReducer = (state, action) => {
         ...state,
         systemTheme,
         isDark,
-        theme: { 
-          ...newTheme, 
-          typography, 
-          fonts: { regular: typography.body1 } 
+        theme: {
+          ...newTheme,
+          typography,
+          fonts: {
+            regular: typography.body1.fontFamily || 'System',
+            medium: typography.label.fontFamily || 'System',
+            bold: typography.h1.fontFamily || 'System',
+          },
         },
       };
     }
@@ -72,8 +88,12 @@ const themeReducer = (state, action) => {
       const updatedTheme = {
         ...state.theme,
         ...action.payload,
+        fonts: {
+          ...state.theme.fonts,
+          ...(action.payload.fonts || {}),
+        },
       };
-      
+
       return {
         ...state,
         theme: updatedTheme,
