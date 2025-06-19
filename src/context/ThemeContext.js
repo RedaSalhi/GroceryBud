@@ -12,18 +12,22 @@ export const THEME_MODES = {
   AUTO: 'auto',
 };
 
+// Helper to build a full theme object with nested colors and fonts
+const buildTheme = (base) => ({
+  ...base,
+  colors: { ...base },
+  typography,
+  fonts: {
+    regular: typography.body1.fontFamily || 'System',
+    medium: typography.label.fontFamily || 'System',
+    bold: typography.h1.fontFamily || 'System',
+  },
+});
+
 // Initial state
 const initialState = {
   mode: THEME_MODES.AUTO,
-  theme: {
-    ...lightTheme,
-    typography,
-    fonts: {
-      regular: typography.body1.fontFamily || 'System',
-      medium: typography.label.fontFamily || 'System',
-      bold: typography.h1.fontFamily || 'System',
-    },
-  },
+  theme: buildTheme(lightTheme),
   isDark: false,
   systemTheme: Appearance.getColorScheme() || 'light',
 };
@@ -49,15 +53,7 @@ const themeReducer = (state, action) => {
         ...state,
         mode,
         isDark,
-        theme: {
-          ...newTheme,
-          typography,
-          fonts: {
-            regular: typography.body1.fontFamily || 'System',
-            medium: typography.label.fontFamily || 'System',
-            bold: typography.h1.fontFamily || 'System',
-          },
-        },
+        theme: buildTheme(newTheme),
       };
     }
 
@@ -72,22 +68,28 @@ const themeReducer = (state, action) => {
         ...state,
         systemTheme,
         isDark,
-        theme: {
-          ...newTheme,
-          typography,
-          fonts: {
-            regular: typography.body1.fontFamily || 'System',
-            medium: typography.label.fontFamily || 'System',
-            bold: typography.h1.fontFamily || 'System',
-          },
-        },
+        theme: buildTheme(newTheme),
       };
     }
 
     case ActionTypes.UPDATE_THEME: {
+      const colorKeys = Object.keys(lightTheme);
+      const updatedColors = { ...state.theme.colors };
+
+      colorKeys.forEach((key) => {
+        if (Object.prototype.hasOwnProperty.call(action.payload, key)) {
+          updatedColors[key] = action.payload[key];
+        }
+      });
+
+      if (action.payload.colors) {
+        Object.assign(updatedColors, action.payload.colors);
+      }
+
       const updatedTheme = {
         ...state.theme,
         ...action.payload,
+        colors: updatedColors,
         fonts: {
           ...state.theme.fonts,
           ...(action.payload.fonts || {}),

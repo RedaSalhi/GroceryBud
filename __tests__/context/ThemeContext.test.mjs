@@ -12,7 +12,7 @@ function Capture() {
   return null;
 }
 
-test('fonts remain defined after initialization and updateTheme', async () => {
+test('fonts and colors remain defined after initialization and updateTheme', async () => {
   await act(async () => {
     TestRenderer.create(
       <ThemeProvider>
@@ -25,6 +25,8 @@ test('fonts remain defined after initialization and updateTheme', async () => {
   assert.ok(global.__theme.fonts.regular);
   assert.ok(global.__theme.fonts.medium);
   assert.ok(global.__theme.fonts.bold);
+  assert.ok(global.__theme.colors.border);
+  assert.ok(global.__theme.colors.primary);
 
   await act(async () => {
     global.__theme.updateTheme({ colors: { test: '#000' } });
@@ -34,4 +36,6 @@ test('fonts remain defined after initialization and updateTheme', async () => {
   assert.ok(global.__theme.fonts.regular);
   assert.ok(global.__theme.fonts.medium);
   assert.ok(global.__theme.fonts.bold);
+  assert.ok(global.__theme.colors.border);
+  assert.ok(global.__theme.colors.primary);
 });
