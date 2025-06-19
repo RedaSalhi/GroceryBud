@@ -4,6 +4,24 @@ import { STORAGE_KEYS, USER_ROLES } from '../utils/constants';
 import { generateUUID } from '../utils/helpers';
 import { forgotPasswordRequest, resetPasswordRequest } from './authMockService';
 
+// --- Firebase imports ---
+// If you don't want Firebase in certain environments (e.g. unit tests) you can
+// guard these imports behind a condition.  For simplicity we import them
+// eagerly; the library must be installed via `npx expo install firebase`.
+import { auth, db } from '../services/firebase';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  updateProfile,
+  onAuthStateChanged,
+} from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+
+// Toggle between providers.  When running on-device we default to Firebase;
+// during Node-based unit tests you can omit the env var so the mock remains.
+const USE_FIREBASE = process.env.EXPO_PUBLIC_AUTH_PROVIDER === 'firebase';
+
 // Initial state
 const initialState = {
   user: null,
@@ -99,8 +117,16 @@ export const isPremiumUserFromData = (user) => {
 
 // Helper to get all stored users
 const getMockUsers = async () => {
-  const users = await AsyncStorage.getItem(MOCK_USERS_KEY);
-  return users ? JSON.parse(users) : [];
+  try {
+    const users = await AsyncStorage.getItem(MOCK_USERS_KEY);
+    if (!users) return [];
+    return JSON.parse(users);
+  } catch (err) {
+    console.warn('Failed to parse users from storage, resetting mock DB', err);
+    // Clear corrupted data so future parses succeed
+    await AsyncStorage.removeItem(MOCK_USERS_KEY);
+    return [];
+  }
 };
 
 // Mock createAccount
@@ -160,54 +186,150 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
+  // ----------------------------------------------
+  // Bootstrap auth state (Firebase vs Mock)
+  // ----------------------------------------------
   useEffect(() => {
-    const initializeAuth = async () => {
-      dispatch({ type: ActionTypes.SET_LOADING, payload: true });
-      const onboardingStatus = await AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETED);
-      dispatch({ type: ActionTypes.SET_ONBOARDING_COMPLETED, payload: onboardingStatus === 'true' });
-      
-      const userResult = await getCurrentUser();
-      if (userResult.success) {
-        dispatch({ type: ActionTypes.SET_USER, payload: userResult.user });
+    const bootstrap = async () => {
+      // onboarding flag is stored regardless of provider
+      const onboardingStatus = await AsyncStorage.getItem(
+        STORAGE_KEYS.ONBOARDING_COMPLETED,
+      );
+      dispatch({
+        type: ActionTypes.SET_ONBOARDING_COMPLETED,
+        payload: onboardingStatus === 'true',
+      });
+
+      if (USE_FIREBASE) {
+        // Subscribe to Firebase auth state changes
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+          if (firebaseUser) {
+            // Load additionally stored profile (first/last name) if it exists
+            let extra = {};
+            try {
+              const snap = await getDoc(doc(db, 'users', firebaseUser.uid));
+              if (snap.exists()) extra = snap.data();
+            } catch {}
+
+            dispatch({
+              type: ActionTypes.SET_USER,
+              payload: {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                displayName: firebaseUser.displayName,
+                ...extra,
+              },
+            });
+          } else {
+            dispatch({ type: ActionTypes.SET_USER, payload: null });
+          }
+        });
+
+        return () => unsubscribe();
       } else {
-        dispatch({ type: ActionTypes.SET_USER, payload: null });
+        // Fallback mock provider
+        dispatch({ type: ActionTypes.SET_LOADING, payload: true });
+        const userResult = await getCurrentUser();
+        dispatch({
+          type: ActionTypes.SET_USER,
+          payload: userResult.success ? userResult.user : null,
+        });
+        dispatch({ type: ActionTypes.SET_LOADING, payload: false });
       }
-      dispatch({ type: ActionTypes.SET_LOADING, payload: false });
     };
-    initializeAuth();
+
+    bootstrap();
   }, []);
 
   const actions = {
     signUp: async (email, password, additionalData) => {
       dispatch({ type: ActionTypes.SET_LOADING, payload: true });
-      const result = await createAccount(email, password, additionalData);
-      if (result.success) {
-        dispatch({ type: ActionTypes.SET_USER, payload: result.user });
-      } else {
-        dispatch({ type: ActionTypes.SET_ERROR, payload: result.message });
+
+      try {
+        if (USE_FIREBASE) {
+          const cred = await createUserWithEmailAndPassword(auth, email, password);
+          // Update displayName
+          if (additionalData?.displayName) {
+            await updateProfile(cred.user, { displayName: additionalData.displayName });
+          }
+
+          // Persist extra profile info (firstName, lastName) in Firestore
+          await setDoc(doc(db, 'users', cred.user.uid), {
+            firstName: additionalData.firstName,
+            lastName: additionalData.lastName,
+            createdAt: Date.now(),
+          });
+
+          // Local state payload
+          const userPayload = {
+            uid: cred.user.uid,
+            email: cred.user.email,
+            displayName: cred.user.displayName || additionalData.displayName,
+            firstName: additionalData.firstName,
+            lastName: additionalData.lastName,
+          };
+
+          dispatch({ type: ActionTypes.SET_USER, payload: userPayload });
+          return { success: true, user: userPayload };
+        }
+
+        // ---- Mock fallback ----
+        const result = await createAccount(email, password, additionalData);
+        if (result.success) {
+          dispatch({ type: ActionTypes.SET_USER, payload: result.user });
+        } else {
+          dispatch({ type: ActionTypes.SET_ERROR, payload: result.message });
+        }
+        return result;
+      } catch (error) {
+        console.error('SignUp error:', error);
+        dispatch({ type: ActionTypes.SET_ERROR, payload: error.message || 'Failed to create account.' });
+        return { success: false, message: error.message };
+      } finally {
+        dispatch({ type: ActionTypes.SET_LOADING, payload: false });
       }
-      dispatch({ type: ActionTypes.SET_LOADING, payload: false });
-      return result;
     },
     signIn: async (email, password) => {
       dispatch({ type: ActionTypes.SET_LOADING, payload: true });
-      const result = await signIn(email, password);
-      if (result.success) {
-        dispatch({ type: ActionTypes.SET_USER, payload: result.user });
-      } else {
-        dispatch({ type: ActionTypes.SET_ERROR, payload: result.message });
+      try {
+        if (USE_FIREBASE) {
+          const cred = await signInWithEmailAndPassword(auth, email, password);
+          // Auth listener will update state; we still return success immediately
+          return { success: true, user: cred.user };
+        }
+
+        // ---- Mock fallback ----
+        const result = await signIn(email, password);
+        if (result.success) {
+          dispatch({ type: ActionTypes.SET_USER, payload: result.user });
+        } else {
+          dispatch({ type: ActionTypes.SET_ERROR, payload: result.message });
+        }
+        return result;
+      } catch (error) {
+        dispatch({ type: ActionTypes.SET_ERROR, payload: error.message || 'Invalid credentials.' });
+        return { success: false, message: error.message };
+      } finally {
+        dispatch({ type: ActionTypes.SET_LOADING, payload: false });
       }
-      dispatch({ type: ActionTypes.SET_LOADING, payload: false });
-      return result;
     },
     signOut: async () => {
       dispatch({ type: ActionTypes.SET_LOADING, payload: true });
-      const result = await signOutUser();
-      if (result.success) {
-        dispatch({ type: ActionTypes.SIGN_OUT });
+      try {
+        if (USE_FIREBASE) {
+          await firebaseSignOut(auth);
+          dispatch({ type: ActionTypes.SIGN_OUT });
+          return { success: true };
+        }
+
+        const result = await signOutUser();
+        if (result.success) {
+          dispatch({ type: ActionTypes.SIGN_OUT });
+        }
+        return result;
+      } finally {
+        dispatch({ type: ActionTypes.SET_LOADING, payload: false });
       }
-      dispatch({ type: ActionTypes.SET_LOADING, payload: false });
-      return result;
     },
     forgotPassword: async (email) => {
       dispatch({ type: ActionTypes.SET_LOADING, payload: true });

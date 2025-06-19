@@ -19,6 +19,26 @@ const AppNavigator = () => {
   const { isAuthenticated, isLoading, onboardingCompleted } = useAuth();
   const theme = useTheme();
 
+  // Build a theme object compatible with React Navigation (must include fonts)
+  const navigationTheme = {
+    dark: theme.isDark,
+    colors: {
+      primary: theme.primary,
+      background: theme.background,
+      card: theme.surface,
+      text: theme.text,
+      border: theme.border,
+      notification: theme.error,
+    },
+    // React Navigation expects a `fonts` object with specific variants
+    fonts: {
+      regular: { fontFamily: theme.fonts?.regular || 'System', fontWeight: 'normal' },
+      medium: { fontFamily: theme.fonts?.medium || 'System', fontWeight: 'normal' },
+      light: { fontFamily: theme.fonts?.regular || 'System', fontWeight: 'normal' },
+      thin: { fontFamily: theme.fonts?.regular || 'System', fontWeight: 'normal' },
+    },
+  };
+
   // Show loading spinner while checking authentication
   if (isLoading) {
     return <LoadingSpinner />;
@@ -26,17 +46,7 @@ const AppNavigator = () => {
 
   return (
     <NavigationContainer
-      theme={{
-        dark: theme.isDark,
-        colors: {
-          primary: theme.primary,
-          background: theme.background,
-          card: theme.surface,
-          text: theme.text,
-          border: theme.border,
-          notification: theme.error,
-        },
-      }}
+      theme={navigationTheme}
     >
       <Stack.Navigator
         screenOptions={{
