@@ -12,7 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 
 const WelcomeScreen = ({ navigation }) => {
   const theme = useTheme();
-  const { completeOnboarding } = useAuth();
+  const { completeOnboarding, isAuthenticated } = useAuth();
   const styles = getStyles(theme);
 
   const handleGetStarted = () => {
@@ -22,7 +22,7 @@ const WelcomeScreen = ({ navigation }) => {
   const handleSkip = async () => {
     // Complete onboarding and go straight to main app
     await completeOnboarding();
-    navigation.replace('Main');
+    navigation.replace(isAuthenticated ? 'Main' : 'Login');
   };
 
   return (

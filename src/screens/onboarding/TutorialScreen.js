@@ -36,7 +36,7 @@ const tutorialData = [
 
 const TutorialScreen = ({ navigation }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const { completeOnboarding } = useAuth();
+  const { completeOnboarding, isAuthenticated } = useAuth();
   const theme = useTheme();
   const styles = getStyles(theme);
   const flatListRef = useRef(null);
@@ -57,7 +57,7 @@ const TutorialScreen = ({ navigation }) => {
 
   const handleComplete = async () => {
     await completeOnboarding();
-    navigation.replace('Main');
+    navigation.replace(isAuthenticated ? 'Main' : 'Login');
   };
 
   const onViewableItemsChanged = ({ viewableItems }) => {
