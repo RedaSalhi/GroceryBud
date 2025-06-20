@@ -20,6 +20,18 @@ can be found in the [`docs/`](docs/) directory.
    ```bash
    npm test
    ```
+
+## Environment Variables
+
+Set the following variables for Firebase configuration:
+
+```
+EXPO_PUBLIC_FIREBASE_API_KEY
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN
+EXPO_PUBLIC_FIREBASE_PROJECT_ID
+```
+
+After updating `package.json`, run `npm install` to install the new Firebase dependency.
 =======
 ## Running tests
 

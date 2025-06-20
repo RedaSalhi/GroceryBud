@@ -12,11 +12,13 @@ import ErrorBoundary from '../components/common/ErrorBoundary';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import TutorialScreen from '../screens/onboarding/TutorialScreen';
 import WelcomeScreen from '../screens/onboarding/WelcomeScreen';
+import LoginScreen from '../screens/auth/LoginScreen';
+import RegisterScreen from '../screens/auth/RegisterScreen';
 
 const Stack = createStackNavigator();
 
 const AppNavigator = () => {
-  const { isLoading, onboardingCompleted } = useAuth();
+  const { isLoading, onboardingCompleted, isAuthenticated } = useAuth();
   const theme = useTheme();
 
   // Build a theme object compatible with React Navigation (must include fonts)
@@ -52,6 +54,12 @@ const AppNavigator = () => {
             <>
               <Stack.Screen name="Welcome" component={WelcomeScreen} />
               <Stack.Screen name="Tutorial" component={TutorialScreen} />
+            </>
+          )}
+          {!isAuthenticated && (
+            <>
+              <Stack.Screen name="Login" component={LoginScreen} />
+              <Stack.Screen name="Register" component={RegisterScreen} />
             </>
           )}
           <Stack.Screen name="Main" component={TabNavigator} />
